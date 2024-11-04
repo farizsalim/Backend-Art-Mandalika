@@ -95,8 +95,6 @@ const createPayment = async (req, res) => {
             paymentPayload.bank_transfer = bank_transfer;
         }
 
-        console.log('Payload yang dikirim ke Midtrans:', JSON.stringify(paymentPayload, null, 2));
-
         // Kirim permintaan ke Midtrans
         const response = await axios.post('https://api.sandbox.midtrans.com/v2/charge', paymentPayload, {
             headers: {
@@ -121,8 +119,6 @@ const createPayment = async (req, res) => {
             ExpiryTime: response.data.expiry_time || null
         };
         
-        // Simpan ke tabel Payment
-        console.log('PaymentData yang akan disimpan ke database:', JSON.stringify(paymentData, null, 2));
         await db.query('INSERT INTO Payment SET ?', paymentData);
 
         res.status(200).json({ message: 'Payment created successfully.', data: response.data });
@@ -136,27 +132,41 @@ const handleMidtransNotification = async (req, res) => {
     try {
         const notification = req.body;
 
-        // Log notifikasi untuk debugging
+        // Log notifikasi yang diterima untuk debugging
         console.log('Notifikasi yang diterima dari Midtrans:', JSON.stringify(notification, null, 2));
 
         const { transaction_status, order_id, payment_type, transaction_id, va_numbers, settlement_time } = notification;
         let paymentStatus;
 
+        // Log detail transaksi yang diterima
+        console.log('Detail transaksi:', {
+            transaction_status,
+            order_id,
+            payment_type,
+            transaction_id,
+            va_numbers,
+            settlement_time
+        });
+
         // Tentukan status pembayaran berdasarkan status transaksi dari Midtrans
         switch (transaction_status) {
             case 'settlement':
                 paymentStatus = 'completed';
+                console.log('Status transaksi diubah menjadi completed.');
                 break;
             case 'capture':
                 paymentStatus = payment_type === 'credit_card' && notification.fraud_status === 'challenge' ? 'challenge' : 'completed';
+                console.log('Status transaksi diubah menjadi:', paymentStatus);
                 break;
             case 'pending':
                 paymentStatus = 'pending';
+                console.log('Status transaksi diubah menjadi pending.');
                 break;
             case 'deny':
             case 'cancel':
             case 'expire':
                 paymentStatus = 'failed';
+                console.log('Status transaksi diubah menjadi failed.');
                 break;
             default:
                 console.log('Status transaksi tidak dikenal:', transaction_status);
@@ -165,7 +175,7 @@ const handleMidtransNotification = async (req, res) => {
         }
 
         // Log status pembayaran yang diupdate
-        console.log('Status pembayaran yang diupdate:', paymentStatus);
+        console.log('Status pembayaran yang akan diupdate:', paymentStatus);
 
         // Update status di tabel Payment
         const updatePaymentResult = await db.query(`
@@ -174,9 +184,12 @@ const handleMidtransNotification = async (req, res) => {
             WHERE ID_Order = ?
         `, [paymentStatus, order_id]);
 
+        // Log hasil update tabel Payment
         if (updatePaymentResult.affectedRows === 0) {
             console.error('ID_Order tidak ditemukan saat memperbarui Payment:', order_id);
             return res.status(404).json({ message: 'ID_Order tidak ditemukan.' });
+        } else {
+            console.log('Status Payment berhasil diperbarui untuk ID_Order:', order_id);
         }
 
         // Update status di tabel Orders jika pembayaran selesai
@@ -187,19 +200,24 @@ const handleMidtransNotification = async (req, res) => {
                 WHERE ID_Order = ?
             `, [order_id]);
 
+            // Log hasil update tabel Orders
             if (updateOrderResult.affectedRows === 0) {
                 console.error('ID_Order tidak ditemukan saat memperbarui Orders:', order_id);
                 return res.status(404).json({ message: 'ID_Order tidak ditemukan di Orders.' });
+            } else {
+                console.log('Status Order berhasil diperbarui untuk ID_Order:', order_id);
             }
         }
 
         // Kirim respons sukses ke Midtrans
+        console.log('Notifikasi berhasil diproses.');
         res.status(200).json({ message: 'Notifikasi diproses' });
     } catch (error) {
         console.error('Kesalahan saat memproses notifikasi Midtrans:', error);
         res.status(500).json({ message: 'Gagal memproses notifikasi' });
     }
 };
+
 
 module.exports = {
     createPayment,

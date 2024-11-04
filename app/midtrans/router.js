@@ -4,6 +4,9 @@ const { authenticateJWT, verifyMidtransSignature } = require('../../middleware/i
 const router = express.Router();
 
 router.post('/create-payment', authenticateJWT, createPayment);
-router.post('/webhook/midtrans', verifyMidtransSignature, handleMidtransNotification);
+router.post('/webhook/midtrans', (req, res, next) => {
+    console.log('Webhook endpoint dipanggil');
+    next();
+}, verifyMidtransSignature, handleMidtransNotification);
 
 module.exports = router;
