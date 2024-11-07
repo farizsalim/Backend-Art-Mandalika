@@ -11,7 +11,9 @@ const {
         adminUpdate,
         updatePassword,
         resetPassword,
-        forgotPassword
+        forgotPassword,
+        getAllArtists,
+        getUserByCustomer
         } = require('./controller');
 
 const router = express.Router();
@@ -23,12 +25,14 @@ router.post('/login', loginUser);
 
 // Rute yang membutuhkan autentikasi dan otorisasi
 router.get('/users', authenticateJWT, authorize('manage', 'all'), getAllUsers);
-router.get('/users/:id', authenticateJWT, authorize('view', 'User'), getUserById);
-router.put('/users/:id', authenticateJWT, authorize('update', 'User'), uploadUser.single('photo'), updateUser);
+router.get('/users/:id', getUserById);
+router.put('/users', authenticateJWT, authorize('update', 'User'), uploadUser.single('photo'), updateUser);
 router.put('/users/:id/admin', authenticateJWT, authorize('update', 'User'), uploadUser.single('photo'), adminUpdate);
 router.delete('/users/:id', authenticateJWT, authorize('delete', 'User'), deleteUser);
 router.patch('/users/:id/updatePassword', updatePassword);
 router.post('/users/forgot-password', forgotPassword);
 router.post('/users/reset-password', resetPassword);
+router.get('/artist',getAllArtists)
+router.get('/profile', authenticateJWT, getUserByCustomer);
 
 module.exports = router;

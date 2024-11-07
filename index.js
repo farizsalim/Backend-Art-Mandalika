@@ -10,6 +10,8 @@ const addressRoutes = require('./app/address/router')
 const orderRoutes = require('./app/order/router')
 const shipmentRoutes = require('./app/shipment/router')
 const midtransRoutes = require('./app/midtrans/router');
+const reviewRoutes = require('./app/review/router');
+const testRoutes = require('./test')
 const app = express();
 require('dotenv').config();
 
@@ -30,6 +32,10 @@ app.use(`/${apihash}/api/addressapi`, addressRoutes);
 app.use(`/${apihash}/api/order`, orderRoutes);
 app.use(`/${apihash}/api/shipment`, shipmentRoutes);
 app.use(`/${apihash}/api/midtrans`, midtransRoutes);
+app.use(`/${apihash}/api/review`, reviewRoutes);
+app.use(`/${apihash}/images`,express.static('public'))
+app.use(`/${apihash}/api/test`, testRoutes)
+
 
 app.get('/', function (req, res) {
     res.render('index', {

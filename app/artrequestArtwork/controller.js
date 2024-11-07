@@ -4,7 +4,7 @@ const db = require('../../database/database');
 const createArtRequestArtwork = async (req, res) => {
     try {
         const { ID_Artwork, ID_Size, Title_Artrequest, Custom_Description } = req.body;
-        const ID_Customer = req.user.id; // ID pengguna yang terautentikasi dari token
+        const ID_Customer = req.user.id;
 
         // Validasi input
         if (!ID_Artwork || !ID_Size || !Title_Artrequest) {
@@ -27,9 +27,9 @@ const createArtRequestArtwork = async (req, res) => {
         const values = [ID_Customer, ID_Artwork, ID_Size, Title_Artrequest, Custom_Description || null, finalPrice];
 
         const [result] = await db.query(query, values);
-        res.status(201).json({ message: 'Art request berdasarkan artwork berhasil dibuat.', ID_ArtRequest: result.insertId });
+        res.status(201).json({ message: 'Art request berhasil dibuat.', ID_ArtRequest: result.insertId });
     } catch (err) {
-        console.error("Kesalahan saat membuat art request:", err);
+        console.error('Kesalahan saat membuat art request:', err);
         res.status(500).json({ message: 'Gagal membuat art request.' });
     }
 };
@@ -37,22 +37,23 @@ const createArtRequestArtwork = async (req, res) => {
 // Controller untuk mengambil semua Art Request oleh pelanggan berdasarkan Artwork
 const getArtRequestsArtworkByCustomer = async (req, res) => {
     try {
-        const ID_Customer = req.user.id; // ID pengguna yang terautentikasi dari token
-
+        const ID_Customer = req.user.id;
         const [results] = await db.query('SELECT * FROM ArtRequest_Artwork WHERE ID_Customer = ?', [ID_Customer]);
+
         res.status(200).json(results);
     } catch (err) {
-        console.error("Kesalahan saat mengambil art request:", err);
+        console.error('Kesalahan saat mengambil art request:', err);
         res.status(500).json({ message: 'Gagal mengambil art request.' });
     }
 };
 
+// Controller untuk mengambil semua Art Request
 const getAllArtRequestsArtwork = async (req, res) => {
     try {
         const [results] = await db.query('SELECT * FROM ArtRequest_Artwork');
         res.status(200).json(results);
     } catch (err) {
-        console.error("Kesalahan saat mengambil semua art request:", err);
+        console.error('Kesalahan saat mengambil semua art request:', err);
         res.status(500).json({ message: 'Gagal mengambil art request.' });
     }
 };
@@ -61,15 +62,15 @@ const getAllArtRequestsArtwork = async (req, res) => {
 const getArtRequestArtworkById = async (req, res) => {
     try {
         const { ID_ArtRequest } = req.params;
-
         const [results] = await db.query('SELECT * FROM ArtRequest_Artwork WHERE ID_ArtRequest = ?', [ID_ArtRequest]);
+
         if (results.length === 0) {
             return res.status(404).json({ message: 'Art request tidak ditemukan.' });
         }
 
         res.status(200).json(results[0]);
     } catch (err) {
-        console.error("Kesalahan saat mengambil detail art request:", err);
+        console.error('Kesalahan saat mengambil detail art request:', err);
         res.status(500).json({ message: 'Gagal mengambil detail art request.' });
     }
 };
@@ -104,7 +105,7 @@ const updateArtRequestArtwork = async (req, res) => {
         await db.query(updateQuery, values);
         res.status(200).json({ message: 'Art request berhasil diperbarui.' });
     } catch (err) {
-        console.error("Kesalahan saat memperbarui art request:", err);
+        console.error('Kesalahan saat memperbarui art request:', err);
         res.status(500).json({ message: 'Gagal memperbarui art request.' });
     }
 };
@@ -113,24 +114,72 @@ const updateArtRequestArtwork = async (req, res) => {
 const deleteArtRequestArtwork = async (req, res) => {
     try {
         const { ID_ArtRequest } = req.params;
-
         const [result] = await db.query('DELETE FROM ArtRequest_Artwork WHERE ID_ArtRequest = ?', [ID_ArtRequest]);
+
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Art request tidak ditemukan.' });
         }
 
         res.status(200).json({ message: 'Art request berhasil dihapus.' });
     } catch (err) {
-        console.error("Kesalahan saat menghapus art request:", err);
+        console.error('Kesalahan saat menghapus art request:', err);
         res.status(500).json({ message: 'Gagal menghapus art request.' });
+    }
+};
+
+// Middleware untuk memeriksa apakah pengguna dapat membuat art request
+const canRequestArt = async (req, res, next) => {
+    const { id: userId } = req.user;
+
+    try {
+        const [orders] = await db.query(`
+            SELECT o.ID_Order
+            FROM Orders o
+            LEFT JOIN Reviews r ON o.ID_Order = r.ID_Order
+            WHERE o.ID_User = ? AND o.OrderStatus = 'completed' AND r.ID_Review IS NULL
+        `, [userId]);
+
+        if (orders.length > 0) {
+            return res.status(403).json({ message: 'Anda harus memberikan review untuk order yang telah selesai sebelum membuat art request.' });
+        }
+
+        next();
+    } catch (error) {
+        console.error('Kesalahan saat memeriksa status review:', error);
+        res.status(500).json({ message: 'Kesalahan saat memeriksa status review.' });
+    }
+};
+
+const getArtRequestByOrderId = async (req, res) => {
+    const { ID_Order } = req.params;
+
+    try {
+        // Ambil data ArtRequest dengan join dari tabel Orders
+        const [results] = await db.query(`
+            SELECT ar.*
+            FROM Orders o
+            JOIN ArtRequest_Artwork ar ON o.ID_ArtRequest = ar.ID_ArtRequest
+            WHERE o.ID_Order = ?
+        `, [ID_Order]);
+
+        if (results.length === 0) {
+            return res.status(404).json({ message: 'Art request tidak ditemukan untuk ID Order tersebut.' });
+        }
+
+        res.status(200).json(results[0]);
+    } catch (error) {
+        console.error('Kesalahan saat mengambil art request berdasarkan order ID:', error);
+        res.status(500).json({ message: 'Gagal mengambil art request berdasarkan order ID.' });
     }
 };
 
 module.exports = {
     createArtRequestArtwork,
-    getAllArtRequestsArtwork,
     getArtRequestsArtworkByCustomer,
+    getAllArtRequestsArtwork,
     getArtRequestArtworkById,
     updateArtRequestArtwork,
-    deleteArtRequestArtwork
+    deleteArtRequestArtwork,
+    canRequestArt,
+    getArtRequestByOrderId
 };

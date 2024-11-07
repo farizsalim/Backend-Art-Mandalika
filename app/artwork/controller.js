@@ -16,12 +16,12 @@ const determineWeight = (width, height) => {
 };
 
 const addArtworkForArtist = async (req, res) => {
-    const { title, description, stock, sizes } = req.body;
+    const { title, description, stock, sizes, category } = req.body;
     const id_creator = req.user.id;
     const id_uploader = id_creator;
 
-    if (!title || !stock) {
-        return res.status(400).json({ message: 'Title dan Stock harus diisi.' });
+    if (!title || !stock || !category) {
+        return res.status(400).json({ message: 'Title, Stock, dan Category harus diisi.' });
     }
 
     let artworkImage;
@@ -43,10 +43,10 @@ const addArtworkForArtist = async (req, res) => {
 
     try {
         const artworkQuery = `
-            INSERT INTO Artwork (Title_Artwork, ID_Creator, ID_Uploader, Description, ArtworkImage, Stock) 
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO Artwork (Title_Artwork, ID_Creator, ID_Uploader, Description, ArtworkImage, Stock, Category) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         `;
-        const artworkValues = [title, id_creator, id_uploader, description || '', artworkImage, stock];
+        const artworkValues = [title, id_creator, id_uploader, description || '', artworkImage, stock, category];
         const [result] = await db.query(artworkQuery, artworkValues);
 
         const artworkId = result.insertId;
@@ -77,11 +77,23 @@ const addArtworkForArtist = async (req, res) => {
 };
 
 const addArtworkByAdmin = async (req, res) => {
-    const { title, id_creator, description, stock, sizes } = req.body;
+    const { title, id_creator, description, stock, category } = req.body;
     const id_uploader = req.user.id;
 
-    if (!title || !id_creator || !stock) {
-        return res.status(400).json({ message: 'Title, ID_Creator, dan Stock harus diisi.' });
+    // Pastikan required fields ada
+    if (!title || !id_creator || !stock || !category) {
+        return res.status(400).json({ message: 'Title, ID_Creator, Stock, dan Category harus diisi.' });
+    }
+
+    // Parsing sizes menjadi array
+    let sizes;
+    try {
+        sizes = JSON.parse(req.body.sizes);
+        if (!Array.isArray(sizes)) {
+            return res.status(400).json({ message: 'Sizes harus berupa array' });
+        }
+    } catch (error) {
+        return res.status(400).json({ message: 'Data sizes tidak valid' });
     }
 
     let artworkImage;
@@ -103,15 +115,15 @@ const addArtworkByAdmin = async (req, res) => {
 
     try {
         const artworkQuery = `
-            INSERT INTO Artwork (Title_Artwork, ID_Creator, ID_Uploader, Description, ArtworkImage, Stock) 
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO Artwork (Title_Artwork, ID_Creator, ID_Uploader, Description, ArtworkImage, Stock, Category) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         `;
-        const artworkValues = [title, id_creator, id_uploader, description || '', artworkImage, stock];
+        const artworkValues = [title, id_creator, id_uploader, description || '', artworkImage, stock, category];
         const [result] = await db.query(artworkQuery, artworkValues);
 
         const artworkId = result.insertId;
 
-        if (sizes && sizes.length > 0) {
+        if (sizes.length > 0) {
             const sizeValues = sizes.map(size => {
                 let weight = determineWeight(size.width, size.height);
                 if (weight === null && size.weight) {
@@ -136,15 +148,13 @@ const addArtworkByAdmin = async (req, res) => {
     }
 };
 
-const getArtworkById = (req, res) => {
+
+const getArtworkById = async (req, res) => {
     const { id } = req.params;
 
-    const query = 'SELECT * FROM Artwork WHERE ID_Artwork = ?';
-    db.query(query, [id], (err, results) => {
-        if (err) {
-            console.error("Kesalahan saat mengambil data artwork:", err);
-            return res.status(500).json({ message: 'Kesalahan saat mengambil data artwork.' });
-        }
+    try {
+        const query = 'SELECT * FROM Artwork WHERE ID_Artwork = ?';
+        const [results] = await db.query(query, [id]);
 
         if (results.length === 0) {
             return res.status(404).json({ message: 'Karya seni tidak ditemukan.' });
@@ -152,34 +162,33 @@ const getArtworkById = (req, res) => {
 
         // Mengirim data karya seni yang ditemukan
         res.status(200).json(results[0]);
-    });
+    } catch (err) {
+        console.error("Kesalahan saat mengambil data artwork:", err);
+        return res.status(500).json({ message: 'Kesalahan saat mengambil data artwork.' });
+    }
 };
 
-const getAllArtworks = (req, res) => {
-    const query = 'SELECT * FROM Artwork';
-
-    db.query(query, (err, results) => {
-        if (err) {
-            console.error("Kesalahan saat mengambil data artwork:", err);
-            return res.status(500).json({ message: 'Kesalahan saat mengambil data artwork.' });
-        }
+const getAllArtworks = async (req, res) => {
+    try {
+        const query = 'SELECT * FROM Artwork';
+        const [results] = await db.query(query);
 
         // Mengirim data semua karya seni dalam format JSON
         res.status(200).json(results);
-    });
+    } catch (err) {
+        console.error("Kesalahan saat mengambil data artwork:", err);
+        return res.status(500).json({ message: 'Kesalahan saat mengambil data artwork.' });
+    }
 };
 
-const updateArtwork = (req, res) => {
+const updateArtwork = async (req, res) => {
     const { id } = req.params;
     const { title, description, stock } = req.body;
 
-    // Mengambil data karya seni lama untuk memeriksa gambar
-    db.query('SELECT ArtworkImage FROM Artwork WHERE ID_Artwork = ?', [id], (err, results) => {
-        if (err) {
-            console.error("Kesalahan saat mengambil data artwork:", err);
-            return res.status(500).json({ message: 'Kesalahan saat mengambil data artwork.' });
-        }
-
+    try {
+        // Mengambil data karya seni lama untuk memeriksa gambar
+        const [results] = await db.query('SELECT ArtworkImage FROM Artwork WHERE ID_Artwork = ?', [id]);
+        
         if (results.length === 0) {
             return res.status(404).json({ message: 'Karya seni tidak ditemukan.' });
         }
@@ -193,19 +202,16 @@ const updateArtwork = (req, res) => {
             const newImagePath = path.join(__dirname, '../../public/uploads/artwork', newImageFileName);
 
             // Pindahkan gambar baru
-            fs.rename(req.file.path, newImagePath, (err) => {
-                if (err) {
-                    console.error("Kesalahan saat menyimpan gambar baru:", err);
-                    return res.status(500).json({ message: 'Kesalahan saat menyimpan gambar baru.' });
-                }
-            });
+            await fs.rename(req.file.path, newImagePath);
 
             // Hapus gambar lama jika ada
             if (artworkImage) {
                 const oldImagePath = path.join(__dirname, '../../public/uploads/artwork', artworkImage);
-                fs.unlink(oldImagePath, (err) => {
-                    if (err) console.error("Kesalahan saat menghapus gambar lama:", err);
-                });
+                try {
+                    await fs.unlink(oldImagePath);
+                } catch (err) {
+                    console.error("Kesalahan saat menghapus gambar lama:", err);
+                }
             }
 
             // Perbarui dengan nama file gambar baru
@@ -220,25 +226,21 @@ const updateArtwork = (req, res) => {
         `;
         const values = [title, description, artworkImage, stock, id];
 
-        db.query(query, values, (err) => {
-            if (err) {
-                console.error("Kesalahan saat memperbarui data artwork:", err);
-                return res.status(500).json({ message: 'Kesalahan saat memperbarui data artwork.' });
-            }
-            res.status(200).json({ message: 'Data artwork berhasil diperbarui.' });
-        });
-    });
+        await db.query(query, values);
+
+        res.status(200).json({ message: 'Data artwork berhasil diperbarui.' });
+    } catch (err) {
+        console.error("Kesalahan saat memperbarui data artwork:", err);
+        res.status(500).json({ message: 'Kesalahan saat memperbarui data artwork.' });
+    }
 };
 
-const deleteArtwork = (req, res) => {
+const deleteArtwork = async (req, res) => {
     const { id } = req.params;
 
-    // Mengambil data karya seni untuk memeriksa gambar
-    db.query('SELECT ArtworkImage FROM Artwork WHERE ID_Artwork = ?', [id], (err, results) => {
-        if (err) {
-            console.error("Kesalahan saat mengambil data artwork:", err);
-            return res.status(500).json({ message: 'Kesalahan saat mengambil data artwork.' });
-        }
+    try {
+        // Mengambil data karya seni untuk memeriksa gambar
+        const [results] = await db.query('SELECT ArtworkImage FROM Artwork WHERE ID_Artwork = ?', [id]);
 
         if (results.length === 0) {
             return res.status(404).json({ message: 'Karya seni tidak ditemukan.' });
@@ -246,26 +248,95 @@ const deleteArtwork = (req, res) => {
 
         const artworkImage = results[0].ArtworkImage;
 
-        // Hapus karya seni dari database
-        db.query('DELETE FROM Artwork WHERE ID_Artwork = ?', [id], (err) => {
-            if (err) {
-                console.error("Kesalahan saat menghapus data artwork:", err);
-                return res.status(500).json({ message: 'Kesalahan saat menghapus data artwork.' });
-            }
+        // Mulai transaksi untuk memastikan semua operasi berjalan atomik
+        await db.query('START TRANSACTION');
 
-            // Hapus gambar dari server jika ada
-            if (artworkImage) {
-                const imagePath = path.join(__dirname, '../../public/uploads/artwork', artworkImage);
-                fs.unlink(imagePath, (err) => {
-                    if (err) {
-                        console.error("Kesalahan saat menghapus gambar artwork:", err);
-                    }
-                });
-            }
+        // Hapus data terkait di tabel Size
+        await db.query('DELETE FROM Size WHERE ID_Artwork = ?', [id]);
 
-            res.status(200).json({ message: 'Artwork berhasil dihapus.' });
-        });
-    });
+        await db.query('DELETE FROM Artrequest_Artwork WHERE ID_Artwork = ?', [id]);
+
+        // Hapus data terkait di tabel lain jika ada hubungan ke Artwork
+
+        // Hapus data karya seni dari tabel Artwork
+        await db.query('DELETE FROM Artwork WHERE ID_Artwork = ?', [id]);
+
+        // Commit transaksi jika semua operasi berhasil
+        await db.query('COMMIT');
+
+        // Hapus gambar dari server jika ada
+        if (artworkImage) {
+            const imagePath = path.join(__dirname, '../../public/uploads/artwork', artworkImage);
+            try {
+                await fs.unlink(imagePath);
+            } catch (err) {
+                console.error("Kesalahan saat menghapus gambar artwork:", err);
+            }
+        }
+
+        res.status(200).json({ message: 'Artwork dan data terkait berhasil dihapus.' });
+    } catch (err) {
+        // Rollback transaksi jika terjadi kesalahan
+        await db.query('ROLLBACK');
+        console.error("Kesalahan saat menghapus data artwork:", err);
+        res.status(500).json({ message: 'Kesalahan saat menghapus data artwork.' });
+    }
 };
 
-module.exports = { addArtworkForArtist, addArtworkByAdmin, getArtworkById, getAllArtworks, deleteArtwork, updateArtwork };
+const getSizeByIdArtwork = async (req, res) => {
+    const { id_artwork } = req.params;
+
+    try {
+        // Query SQL untuk mengambil data size berdasarkan ID_Artwork
+        const query = 'SELECT * FROM Size WHERE ID_Artwork = ?';
+        const [sizes] = await db.query(query, [id_artwork]);
+
+        if (!sizes || sizes.length === 0) {
+            return res.status(404).json({ message: 'Size tidak ditemukan untuk ID_Artwork yang diberikan.' });
+        }
+
+        // Mengembalikan respons jika data ditemukan
+        return res.status(200).json(sizes);
+    } catch (error) {
+        console.error('Kesalahan saat mengambil ukuran:', error);
+        return res.status(500).json({ message: 'Kesalahan internal server.' });
+    }
+};
+
+const getSizeById = async (req, res) => {
+    const { id_size } = req.params;
+
+    try {
+        // Query SQL untuk mengambil data size berdasarkan ID_Size
+        const query = 'SELECT * FROM Size WHERE ID_Size = ?';
+        const [size] = await db.query(query, [id_size]);
+
+        if (!size || size.length === 0) {
+            return res.status(404).json({ message: 'Size tidak ditemukan untuk ID_Size yang diberikan.' });
+        }
+
+        // Mengembalikan respons jika data ditemukan
+        return res.status(200).json(size[0]);
+    } catch (error) {
+        console.error('Kesalahan saat mengambil ukuran berdasarkan ID_Size:', error);
+        return res.status(500).json({ message: 'Kesalahan internal server.' });
+    }
+};
+
+const incrementViewCount = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        await db.query('UPDATE Artwork SET ViewCount = ViewCount + 1 WHERE ID_Artwork = ?', [id]);
+        res.status(200).json({ message: 'View count incremented' });
+    } catch (error) {
+        console.error('Error incrementing view count:', error);
+        res.status(500).json({ message: 'Failed to increment view count' });
+    }
+};
+
+module.exports = { addArtworkForArtist, 
+    addArtworkByAdmin, 
+    getArtworkById, getAllArtworks, 
+    deleteArtwork, updateArtwork, 
+    getSizeByIdArtwork,getSizeById, incrementViewCount };

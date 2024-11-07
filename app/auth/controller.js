@@ -80,7 +80,7 @@ const loginUser = async (req, res) => {
             return res.status(401).json({ message: 'Password salah.' });
         }
 
-        const token = jwt.sign({ id: user.ID_User, role: user.User_Type }, process.env.JWT_SECRET, { expiresIn: '1w' });
+        const token = jwt.sign({ id: user.ID_User, role: user.User_Type, name: user.Username }, process.env.JWT_SECRET, { expiresIn: '1w' });
         res.status(200).json({
             message: 'Login berhasil.',
             token,
@@ -128,7 +128,7 @@ const getUserById = async (req, res) => {
 };
 
 const updateUser = async (req, res) => {
-    const { id } = req.params;
+    const ID_User = req.user.id; // Ambil ID_User dari token (middleware auth)
     const { phone_number, bio } = req.body;
     let photoFileName;
 
@@ -139,22 +139,25 @@ const updateUser = async (req, res) => {
             const newPath = path.join(__dirname, '../../public/user', photoFileName);
             fs.renameSync(req.file.path, newPath);
 
-            const [results] = await db.query('SELECT Photo FROM Users WHERE ID_User = ?', [id]);
+            // Ambil foto lama dari database untuk dihapus jika ada
+            const [results] = await db.query('SELECT Photo FROM Users WHERE ID_User = ?', [ID_User]);
             const oldPhoto = results[0]?.Photo;
             if (oldPhoto && oldPhoto !== defaultImagePath) {
                 fs.unlinkSync(path.join(__dirname, '../../public/user', oldPhoto));
             }
         }
 
+        // Persiapkan field yang akan diperbarui
         const fieldsToUpdate = {
             phone_number,
             bio,
             Photo: photoFileName || undefined,
         };
 
+        // Hapus field yang undefined
         Object.keys(fieldsToUpdate).forEach(key => fieldsToUpdate[key] === undefined && delete fieldsToUpdate[key]);
 
-        await db.query('UPDATE Users SET ?, updated_at = CURRENT_TIMESTAMP WHERE ID_User = ?', [fieldsToUpdate, id]);
+        await db.query('UPDATE Users SET ?, updated_at = CURRENT_TIMESTAMP WHERE ID_User = ?', [fieldsToUpdate, ID_User]);
         res.status(200).json({ message: 'Data pengguna berhasil diperbarui.' });
     } catch (err) {
         console.error("Error updating user:", err);
@@ -329,6 +332,37 @@ const resetPassword = async (req, res) => {
     }
 };
 
+const getAllArtists = async (req, res) => {
+    try {
+        const [results] = await db.query(
+            'SELECT Username, Artist_Name, Bio, Photo FROM Users WHERE User_Type = ?', 
+            ['artist']
+        );
+        res.status(200).json(results);
+    } catch (err) {
+        console.error("Error fetching artists:", err);
+        return res.status(500).json({ message: 'Kesalahan dalam mengambil data artist.' });
+    }
+};
+
+const getUserByCustomer = async (req, res) => {
+    // Ambil ID pengguna dari token (misalnya disimpan di middleware auth)
+    const ID_User = req.user.id;
+
+    try {
+        const [results] = await db.query('SELECT ID_User, Username, Email, Phone_Number, Photo, User_Type, Artist_Name, Bio FROM Users WHERE ID_User = ?', [ID_User]);
+        if (results.length === 0) {
+            return res.status(404).json({ message: 'Pengguna tidak ditemukan.' });
+        }
+
+        res.status(200).json(results[0]);
+    } catch (err) {
+        console.error("Error fetching user:", err);
+        return res.status(500).json({ message: 'Kesalahan dalam mengambil data pengguna.' });
+    }
+};
+
+
 module.exports = { 
     registerUser, 
     loginUser, 
@@ -339,5 +373,7 @@ module.exports = {
     deleteUser,
     updatePassword,
     forgotPassword,
-    resetPassword
+    resetPassword,
+    getAllArtists,
+    getUserByCustomer
 };

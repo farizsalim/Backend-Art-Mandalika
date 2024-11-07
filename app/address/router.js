@@ -9,7 +9,8 @@ const {
     addOriginAddress,
     updateOriginAddress,
     deleteOriginAddress,
-    getOriginAddresses
+    getOriginAddresses,
+    updatePrimaryAddress
 } = require('./controller');
 const { authenticateJWT, authorize } = require('../../middleware/index'); // Pastikan path ke middleware sesuai
 
@@ -37,5 +38,7 @@ router.delete('/origin-address/:ID_OriginAddress', authenticateJWT, authorize('d
 router.get('/origin-address', authenticateJWT, authorize('read', 'OriginAddress'), getOriginAddresses);
 
 router.get('/origin-address/:ID_Origin', authenticateJWT, authorize('read', 'OriginAddress'), getOriginAddresses);
+
+router.patch('/address/:ID_Address/set-primary', authenticateJWT, updatePrimaryAddress);
 
 module.exports = router;

@@ -48,93 +48,79 @@ const createOrder = async (req, res) => {
 };
 
 // Controller untuk mendapatkan order berdasarkan customer
-const getOrdersByCustomer = (req, res) => {
+const getOrdersByCustomer = async (req, res) => {
     const ID_User = req.user.id;
 
-    db.query('SELECT * FROM Orders WHERE ID_User = ?', [ID_User], (err, results) => {
-        if (err) {
-            return res.status(500).json({ message: 'Gagal mengambil data order.' });
-        }
+    try {
+        const [results] = await db.query('SELECT * FROM Orders WHERE ID_User = ?', [ID_User]);
         res.status(200).json(results);
-    });
+    } catch (err) {
+        console.error('Error fetching orders:', err);
+        res.status(500).json({ message: 'Gagal mengambil data order.' });
+    }
 };
 
-// Controller untuk mendapatkan order berdasarkan ID
-const getOrderById = (req, res) => {
+const getOrderById = async (req, res) => {
     const { ID_Order } = req.params;
 
-    db.query('SELECT * FROM Orders WHERE ID_Order = ?', [ID_Order], (err, results) => {
-        if (err) {
-            return res.status(500).json({ message: 'Gagal mengambil detail order.' });
-        }
-
+    try {
+        const [results] = await db.query('SELECT * FROM Orders WHERE ID_Order = ?', [ID_Order]);
         if (results.length === 0) {
             return res.status(404).json({ message: 'Order tidak ditemukan.' });
         }
-
         res.status(200).json(results[0]);
-    });
+    } catch (err) {
+        console.error('Error fetching order by ID:', err);
+        res.status(500).json({ message: 'Gagal mengambil detail order.' });
+    }
 };
 
-// Controller untuk mendapatkan semua order (hanya admin)
-const getAllOrders = (req, res) => {
-    db.query('SELECT * FROM Orders', (err, results) => {
-        if (err) {
-            return res.status(500).json({ message: 'Gagal mengambil semua data order.' });
-        }
+const getAllOrders = async (req, res) => {
+    try {
+        // Query untuk join antara Orders, Users, dan Shipment
+        const query = `
+            SELECT Orders.*, Users.Username, Shipment.TrackingNumber 
+            FROM Orders
+            JOIN Users ON Orders.ID_User = Users.ID_User
+            LEFT JOIN Shipment ON Orders.ID_Shipment = Shipment.ID_Shipment
+        `;
+        
+        const [results] = await db.query(query);
+        
         res.status(200).json(results);
-    });
+    } catch (err) {
+        console.error('Error fetching all orders with user and shipment information:', err);
+        res.status(500).json({ message: 'Gagal mengambil semua data order dengan informasi pengguna dan pengiriman.' });
+    }
 };
 
-// Controller untuk membatalkan order
-const cancelOrder = (req, res) => {
+const updateOrderStatus = async (req, res) => {
     const { ID_Order } = req.params;
-    const ID_User = req.user.id;
+    const { status } = req.body;
 
-    db.query('SELECT * FROM Orders WHERE ID_Order = ? AND ID_User = ?', [ID_Order, ID_User], (err, results) => {
-        if (err || results.length === 0) {
-            return res.status(404).json({ message: 'Order tidak ditemukan atau bukan milik Anda.' });
-        }
-
-        if (results[0].OrderStatus !== 'pending') {
-            return res.status(400).json({ message: 'Order hanya bisa dibatalkan jika status masih pending.' });
-        }
-
-        db.query('UPDATE Orders SET OrderStatus = "cancelled" WHERE ID_Order = ?', [ID_Order], (err) => {
-            if (err) {
-                return res.status(500).json({ message: 'Gagal membatalkan order.' });
-            }
-            res.status(200).json({ message: 'Order berhasil dibatalkan.' });
-        });
-    });
-};
-
-// Controller untuk memperbarui status order (hanya admin)
-const updateOrderStatus = (req, res) => {
-    const { ID_Order } = req.params;
-    const { status } = req.body; // status baru yang akan diupdate
-
-    const validStatuses = ['processing', 'shipped', 'completed'];
+    // Tambahkan semua status yang ada di frontend ke validasi backend
+    const validStatuses = ['pending', 'processing', 'shipped', 'completed', 'cancelled'];
 
     if (!validStatuses.includes(status)) {
         return res.status(400).json({ message: 'Status tidak valid.' });
     }
 
-    db.query('UPDATE Orders SET OrderStatus = ? WHERE ID_Order = ?', [status, ID_Order], (err) => {
-        if (err) {
-            return res.status(500).json({ message: 'Gagal mengupdate status order.' });
-        }
+    try {
+        await db.query('UPDATE Orders SET OrderStatus = ? WHERE ID_Order = ?', [status, ID_Order]);
         res.status(200).json({ message: `Status order berhasil diubah menjadi ${status}.` });
-    });
+    } catch (err) {
+        console.error('Error updating order status:', err);
+        res.status(500).json({ message: 'Gagal mengupdate status order.' });
+    }
 };
 
-// Controller untuk user mengkonfirmasi penerimaan barang
-const confirmOrderReceived = (req, res) => {
+const confirmOrderReceived = async (req, res) => {
     const { ID_Order } = req.params;
     const ID_User = req.user.id;
 
-    db.query('SELECT * FROM Orders WHERE ID_Order = ? AND ID_User = ?', [ID_Order, ID_User], (err, results) => {
-        if (err || results.length === 0) {
+    try {
+        const [results] = await db.query('SELECT * FROM Orders WHERE ID_Order = ? AND ID_User = ?', [ID_Order, ID_User]);
+        if (results.length === 0) {
             return res.status(404).json({ message: 'Order tidak ditemukan atau bukan milik Anda.' });
         }
 
@@ -142,13 +128,94 @@ const confirmOrderReceived = (req, res) => {
             return res.status(400).json({ message: 'Hanya bisa mengkonfirmasi order yang sedang diantar.' });
         }
 
-        db.query('UPDATE Orders SET UserConfirmed = true WHERE ID_Order = ?', [ID_Order], (err) => {
-            if (err) {
-                return res.status(500).json({ message: 'Gagal mengkonfirmasi penerimaan order.' });
-            }
-            res.status(200).json({ message: 'Order berhasil dikonfirmasi sudah diterima.' });
-        });
-    });
+        await db.query('UPDATE Orders SET UserConfirmed = true WHERE ID_Order = ?', [ID_Order]);
+        await db.query('UPDATE Orders SET OrderStatus = "Completed" WHERE ID_Order = ?', [ID_Order]);
+
+        res.status(200).json({ message: 'Order berhasil dikonfirmasi sudah diterima.' });
+    } catch (err) {
+        console.error('Error confirming order received:', err);
+        res.status(500).json({ message: 'Gagal mengkonfirmasi penerimaan order.' });
+    }
+};
+
+// Controller untuk mendapatkan order berdasarkan ID_ArtRequest
+const getOrderByArtRequestId = async (req, res) => {
+    const { ID_ArtRequest } = req.params;
+
+    try {
+        const [results] = await db.query('SELECT * FROM Orders WHERE ID_ArtRequest = ?', [ID_ArtRequest]);
+        if (results.length === 0) {
+            return res.status(404).json({ message: 'Order tidak ditemukan untuk ID ArtRequest tersebut.' });
+        }
+        res.status(200).json(results[0]);
+    } catch (err) {
+        console.error('Error fetching order by ID_ArtRequest:', err);
+        res.status(500).json({ message: 'Gagal mengambil order berdasarkan ID ArtRequest.' });
+    }
+};
+
+const getShippedOrdersCount = async (req, res) => {
+    const ID_User = req.user.id;
+
+    try {
+        const [results] = await db.query(`
+            SELECT COUNT(*) AS shippedCount
+            FROM Orders
+            WHERE ID_User = ? AND OrderStatus = 'shipped'
+        `, [ID_User]);
+
+        res.status(200).json({ shippedCount: results[0].shippedCount });
+    } catch (error) {
+        console.error('Error fetching shipped orders:', error);
+        res.status(500).json({ message: 'Failed to fetch shipped orders.' });
+    }
+};
+
+const updateTrackingNumber = async (req, res) => {
+    const { ID_Order } = req.params;
+    const { trackingNumber } = req.body;
+
+    try {
+        // Pastikan order yang di-update berstatus 'paid'
+        const [orderResult] = await db.query(`SELECT * FROM Orders WHERE ID_Order = ? AND (OrderStatus = "paid" OR OrderStatus = 'shipped')`, [ID_Order]);
+
+        if (orderResult.length === 0) {
+            return res.status(400).json({ message: 'Order tidak ditemukan atau belum berstatus paid.' });
+        }
+
+        // Update TrackingNumber pada tabel Shipment
+        await db.query('UPDATE Shipment SET TrackingNumber = ? WHERE ID_Shipment = ?', [trackingNumber, orderResult[0].ID_Shipment]);
+
+        res.status(200).json({ message: 'Tracking number berhasil diperbarui.' });
+    } catch (err) {
+        console.error('Error updating tracking number:', err);
+        res.status(500).json({ message: 'Gagal memperbarui tracking number.' });
+    }
+};
+
+const cancelOrder = async (req, res) => {
+    const { orderId } = req.params;
+
+    try {
+        // Query untuk mencari order berdasarkan ID
+        const [order] = await db.query('SELECT * FROM orders WHERE ID_Order = ?', [orderId]);
+        
+        // Pastikan order ditemukan dan statusnya bisa dibatalkan
+        if (order.length === 0) {
+            return res.status(404).json({ message: "Order not found" });
+        }
+        if (order[0].OrderStatus !== 'pending') {
+            return res.status(400).json({ message: "Order cannot be canceled" });
+        }
+
+        // Update status order ke "cancelled"
+        await db.query('UPDATE orders SET OrderStatus = ? WHERE ID_Order = ?', ['cancelled', orderId]);
+
+        return res.status(200).json({ message: "Order has been canceled successfully" });
+    } catch (error) {
+        console.error("Error canceling order:", error);
+        res.status(500).json({ message: "An error occurred while canceling the order" });
+    }
 };
 
 module.exports = {
@@ -158,5 +225,8 @@ module.exports = {
     getAllOrders,
     cancelOrder,
     updateOrderStatus,
-    confirmOrderReceived
+    confirmOrderReceived,
+    getOrderByArtRequestId,
+    getShippedOrdersCount,
+    updateTrackingNumber
 };

@@ -7,9 +7,12 @@ const {
     getAllOrders,
     cancelOrder,
     updateOrderStatus,
-    confirmOrderReceived
+    confirmOrderReceived,
+    getShippedOrdersCount,
+    updateTrackingNumber
 } = require('./controller');
 const { authenticateJWT, authorize } = require('../../middleware/index'); // Sesuaikan path ke middleware sesuai
+const { getAllArtRequestsArtwork } = require('../artrequestArtwork/controller');
 
 // Endpoint untuk membuat order baru
 router.post('/data', authenticateJWT, authorize('create', 'Order'), createOrder);
@@ -21,15 +24,22 @@ router.get('/data', authenticateJWT, authorize('read', 'Order'), getOrdersByCust
 router.get('/data/:ID_Order', authenticateJWT, authorize('read', 'Order'), getOrderById);
 
 // Endpoint untuk mendapatkan semua order (hanya admin)
-router.get('/data/all', authenticateJWT, authorize('read', 'Order'), getAllOrders);
+router.get('/dataall', authenticateJWT, getAllOrders);
 
 // Endpoint untuk membatalkan order (hanya jika status pending)
-router.delete('/data/:ID_Order', authenticateJWT, authorize('delete', 'Order'), cancelOrder);
+router.patch('/data/:orderId/cancel', authenticateJWT, cancelOrder);
 
 // Endpoint untuk memperbarui status order (hanya admin)
-router.put('/data/:ID_Order/status', authenticateJWT, authorize('update', 'Order'), updateOrderStatus);
+router.patch('/data/:ID_Order/status', authenticateJWT, authorize('update', 'Order'), updateOrderStatus);
 
 // Endpoint untuk user mengkonfirmasi penerimaan barang
 router.put('/data/:ID_Order/confirm', authenticateJWT, authorize('update', 'Order'), confirmOrderReceived);
+
+router.get('data/request/:ID_ArtRequest', getAllArtRequestsArtwork)
+
+router.get('/shipped-count', authenticateJWT, getShippedOrdersCount);
+
+router.patch('/data/:ID_Order/tracking',authenticateJWT, updateTrackingNumber);
+
 
 module.exports = router;

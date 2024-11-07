@@ -59,45 +59,34 @@ const uploadArtwork = multer({ storage: artworkStorage });
 // Middleware untuk memverifikasi webhook dari Midtrans
 const verifyMidtransSignature = (req, res, next) => {
     try {
-        // Log semua header yang diterima untuk memastikan header yang tepat digunakan
-        console.log('Headers yang diterima:', req.headers);
+        // Ambil signature_key dari body request
+        const { signature_key, order_id, status_code, gross_amount } = req.body;
 
-        // Ambil signature dari header
-        const signatureKey = req.header['X-SIGNATURE']
-        console.log('Signature key yang ditemukan:', signatureKey);
-
-        if (!signatureKey) {
+        if (!signature_key) {
             console.error('Signature key tidak ditemukan');
             return res.status(403).json({ message: 'Signature key tidak ditemukan' });
         }
 
-        // Log body request untuk memeriksa payload yang digunakan dalam hashing
-        console.log('Body request:', req.body);
-
-        // Konversi body menjadi string untuk hashing
-        const body = JSON.stringify(req.body);
+        // Buat string yang digunakan untuk hashing
         const serverKey = process.env.MIDTRANS_SERVER_KEY;
+        const stringToHash = order_id + status_code + gross_amount + serverKey;
 
         // Hitung hash menggunakan server key
-        const hash = crypto.createHmac('sha512', serverKey).update(body).digest('hex');
-
-        // Log hash yang dihitung dan signature yang diterima dari Midtrans
-        console.log('Hash yang dihitung:', hash);
-        console.log('Signature dari Midtrans:', signatureKey);
+        const hash = crypto.createHash('sha512').update(stringToHash).digest('hex');
 
         // Bandingkan hash yang dihitung dengan signature yang diterima
-        if (hash !== signatureKey) {
+        if (hash !== signature_key) {
             console.error('Signature tidak valid');
             return res.status(403).json({ message: 'Signature tidak valid' });
         }
 
-        console.log('Signature valid. Lanjutkan ke handler berikutnya.');
         next();
     } catch (err) {
         console.error('Error saat memverifikasi signature Midtrans:', err);
         res.status(500).json({ message: 'Gagal memverifikasi signature' });
     }
 };
+
 
 
 module.exports = { authorize, authenticateJWT, uploadUser, uploadArtwork, verifyMidtransSignature };

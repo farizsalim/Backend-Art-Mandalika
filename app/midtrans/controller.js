@@ -1,7 +1,6 @@
 const db = require('../../database/database');
 const axios = require('axios');
 
-
 const createPayment = async (req, res) => {
     try {
         const { transaction_details, payment_type, bank_transfer } = req.body;
@@ -196,7 +195,7 @@ const handleMidtransNotification = async (req, res) => {
         if (paymentStatus === 'completed') {
             const updateOrderResult = await db.query(`
                 UPDATE Orders
-                SET OrderStatus = 'completed', UpdatedAt = NOW()
+                SET OrderStatus = 'Paid', UpdatedAt = NOW()
                 WHERE ID_Order = ?
             `, [order_id]);
 
@@ -218,8 +217,25 @@ const handleMidtransNotification = async (req, res) => {
     }
 };
 
+const getPayment = async (req, res) => {
+    try {
+        const { id_Order } = req.params;
 
+        // Query the Payment table to get the payment details based on ID_Payment
+        const [paymentResults] = await db.query('SELECT * FROM Payment WHERE ID_Order = ?', [id_Order]);
+
+        if (paymentResults.length === 0) {
+            return res.status(404).json({ message: 'Payment not found.' });
+        }
+
+        res.status(200).json({ data: paymentResults[0] });
+    } catch (error) {
+        console.error('Error fetching payment details:', error);
+        res.status(500).json({ message: 'Failed to fetch payment details.', error: error.message });
+    }
+};
 module.exports = {
     createPayment,
-    handleMidtransNotification
+    handleMidtransNotification,
+    getPayment
 }
