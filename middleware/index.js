@@ -30,6 +30,12 @@ const authorize = (action, subject) => {
             return res.status(403).json({ message: 'Anda tidak memiliki akses ke resource ini.' });
         }
 
+        if (!user) {  
+            if (action === 'read' && resource === 'NewsEvent') {  
+                return next(); // Izinkan akses  
+            }  
+        }  
+        
         // Jika memiliki izin, lanjutkan ke handler berikutnya
         next();
     };
@@ -43,18 +49,15 @@ const userstorage = multer.diskStorage({
 
 const uploadUser = multer({ storage: userstorage });
 
-const artworkStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, 'public/uploads/artwork/'); // Folder untuk menyimpan gambar karya seni
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + path.extname(file.originalname)); // Nama unik untuk setiap file
-    }
-});
+// Konfigurasi Multer untuk file gambar artwork (menggunakan memoryStorage untuk memproses gambar langsung di memori)
+const artworkStorage = multer.memoryStorage();  // Menggunakan memoryStorage untuk menyimpan gambar di buffer memori
 
-// Konfigurasi multer untuk upload
+// Konfigurasi Multer untuk upload artwork
 const uploadArtwork = multer({ storage: artworkStorage });
+const uploadArtworkCustom = multer({ storage: artworkStorage });
+
+const uploadNewsEventImage = multer({ storage: artworkStorage });
+const uploadGallery = multer({ storage: artworkStorage });
 
 // Middleware untuk memverifikasi webhook dari Midtrans
 const verifyMidtransSignature = (req, res, next) => {
@@ -89,4 +92,4 @@ const verifyMidtransSignature = (req, res, next) => {
 
 
 
-module.exports = { authorize, authenticateJWT, uploadUser, uploadArtwork, verifyMidtransSignature };
+module.exports = { authorize, authenticateJWT, uploadUser, uploadArtwork, uploadNewsEventImage,uploadArtworkCustom, uploadGallery, verifyMidtransSignature };

@@ -80,7 +80,17 @@ const loginUser = async (req, res) => {
             return res.status(401).json({ message: 'Password salah.' });
         }
 
-        const token = jwt.sign({ id: user.ID_User, role: user.User_Type, name: user.Username }, process.env.JWT_SECRET, { expiresIn: '1w' });
+        // Tambahkan atau ubah role berdasarkan logika tertentu
+        let role = user.User_Type;
+        if (email === 'admin@example.com') {
+            role = 'Admin'; // Set role secara manual untuk email tertentu
+        } else if (email.endsWith('@company.com')) {
+            role = 'Employee'; // Set role berdasarkan domain email
+        }
+
+        // Buat JWT dengan role yang diperbarui
+        const token = jwt.sign({ id: user.ID_User, role: role, name: user.Username }, process.env.JWT_SECRET, { expiresIn: '1w' });
+
         res.status(200).json({
             message: 'Login berhasil.',
             token,
@@ -90,7 +100,7 @@ const loginUser = async (req, res) => {
                 email: user.Email,
                 phone_number: user.Phone_Number,
                 photo: user.Photo,
-                user_type: user.User_Type,
+                user_type: role, // Kirim role yang sudah diperbarui
                 artist_name: user.Artist_Name,
                 bio: user.Bio
             }
@@ -335,7 +345,7 @@ const resetPassword = async (req, res) => {
 const getAllArtists = async (req, res) => {
     try {
         const [results] = await db.query(
-            'SELECT Username, Artist_Name, Bio, Photo FROM Users WHERE User_Type = ?', 
+            'SELECT Id_User,Username, Artist_Name, Bio, Photo FROM Users WHERE User_Type = ?', 
             ['artist']
         );
         res.status(200).json(results);
@@ -362,6 +372,31 @@ const getUserByCustomer = async (req, res) => {
     }
 };
 
+const updateUserType = async (req, res) => {
+    const { id } = req.params; // Ambil ID user dari parameter URL
+    const { user_type } = req.body; // Ambil tipe pengguna baru dari body request
+
+    if (!user_type) {
+        return res.status(400).json({ message: 'Tipe pengguna harus diisi.' });
+    }
+
+    try {
+        // Periksa apakah pengguna dengan ID yang diberikan ada
+        const [user] = await db.query('SELECT * FROM Users WHERE ID_User = ?', [id]);
+        if (user.length === 0) {
+            return res.status(404).json({ message: 'Pengguna tidak ditemukan.' });
+        }
+
+        // Update tipe pengguna di database
+        await db.query('UPDATE Users SET User_Type = ?, updated_at = CURRENT_TIMESTAMP WHERE ID_User = ?', [user_type, id]);
+
+        res.status(200).json({ message: 'Tipe pengguna berhasil diperbarui.' });
+    } catch (error) {
+        console.error("Kesalahan saat memperbarui tipe pengguna:", error);
+        return res.status(500).json({ message: 'Kesalahan pada server.' });
+    }
+};
+
 
 module.exports = { 
     registerUser, 
@@ -375,5 +410,6 @@ module.exports = {
     forgotPassword,
     resetPassword,
     getAllArtists,
-    getUserByCustomer
+    getUserByCustomer,
+    updateUserType
 };

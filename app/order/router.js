@@ -9,13 +9,14 @@ const {
     updateOrderStatus,
     confirmOrderReceived,
     getShippedOrdersCount,
-    updateTrackingNumber
+    updateTrackingNumber,
+    createOrderArtworkCustom
 } = require('./controller');
 const { authenticateJWT, authorize } = require('../../middleware/index'); // Sesuaikan path ke middleware sesuai
-const { getAllArtRequestsArtwork } = require('../artrequestArtwork/controller');
 
 // Endpoint untuk membuat order baru
 router.post('/data', authenticateJWT, authorize('create', 'Order'), createOrder);
+router.post('/datacustom', authenticateJWT, authorize('create', 'Order'), createOrderArtworkCustom);
 
 // Endpoint untuk mendapatkan daftar order milik pengguna yang sedang login
 router.get('/data', authenticateJWT, authorize('read', 'Order'), getOrdersByCustomer);
@@ -34,8 +35,6 @@ router.patch('/data/:ID_Order/status', authenticateJWT, authorize('update', 'Ord
 
 // Endpoint untuk user mengkonfirmasi penerimaan barang
 router.put('/data/:ID_Order/confirm', authenticateJWT, authorize('update', 'Order'), confirmOrderReceived);
-
-router.get('data/request/:ID_ArtRequest', getAllArtRequestsArtwork)
 
 router.get('/shipped-count', authenticateJWT, getShippedOrdersCount);
 

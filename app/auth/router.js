@@ -13,7 +13,8 @@ const {
         resetPassword,
         forgotPassword,
         getAllArtists,
-        getUserByCustomer
+        getUserByCustomer,
+        updateUserType
         } = require('./controller');
 
 const router = express.Router();
@@ -34,5 +35,6 @@ router.post('/users/forgot-password', forgotPassword);
 router.post('/users/reset-password', resetPassword);
 router.get('/artist',getAllArtists)
 router.get('/profile', authenticateJWT, getUserByCustomer);
+router.patch('/users/:id/user-type', updateUserType);
 
 module.exports = router;

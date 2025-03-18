@@ -6,21 +6,28 @@ const { getArtworkById,
         getAllArtworks,
         updateArtwork,
         deleteArtwork,
-        addArtworkForArtist,
+        addArtworkByArtist,
         addArtworkByAdmin,
-        getSizeByIdArtwork,
-        getSizeById,
-        incrementViewCount
+        getDetailsByIdArtwork,
+        getDetailById,
+        incrementViewCount,
+        getCustomArtworkWithDetailsById,
+        addArtworkCustom,
+        getArtworkByOrderId
     } = require("./controller")
 
-router.post('/data', authenticateJWT, authorize('create', 'Artwork'), uploadArtwork.single('image'), addArtworkForArtist);
+router.post('/data', authenticateJWT, authorize('create', 'Artwork'), uploadArtwork.single('image'), addArtworkByArtist);
 router.post('/data/admin', authenticateJWT, authorize('create', 'Artwork'), uploadArtwork.single('image'), addArtworkByAdmin);
 router.get('/data/:id', getArtworkById);
 router.get('/data', getAllArtworks);
 router.put('/data/:id', authenticateJWT, authorize('update', 'Artwork'), uploadArtwork.single('image'), updateArtwork);
 router.delete('/data/:id', authenticateJWT, authorize('delete', 'Artwork'), deleteArtwork);
-router.get('/size/:id_artwork', getSizeByIdArtwork)
-router.get('/size/data/:id_size', getSizeById);
+router.get('/details/:id_artwork', getDetailsByIdArtwork)
+router.get('/details/data/:id_size', getDetailById);
 router.patch('/data/:id/view', incrementViewCount);
+router.post('/datacustom', authenticateJWT, authorize('create', 'ArtworkCustom'), uploadArtwork.single('image'), addArtworkCustom);
+router.get('/datacustom/:id', getCustomArtworkWithDetailsById);
+router.get('/data/order/:ID_Order', getArtworkByOrderId)
+
 
 module.exports = router;

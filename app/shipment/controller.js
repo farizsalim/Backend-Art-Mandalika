@@ -1,7 +1,6 @@
 const db = require('../../database/database');
 const axios = require('axios');
 
-// Controller untuk menyimpan data pengiriman ke tabel Shipment
 const createShipment = async (req, res) => {
     const { courier, service, cost, estimatedDelivery } = req.body;
 
@@ -20,7 +19,6 @@ const createShipment = async (req, res) => {
     }
 };
 
-// Controller untuk mendapatkan data pengiriman berdasarkan ID
 const getShipmentById = async (req, res) => {
     const { ID_Shipment } = req.params;
 
@@ -36,7 +34,6 @@ const getShipmentById = async (req, res) => {
     }
 };
 
-// Controller untuk memperbarui nomor resi
 const updateTrackingNumber = async (req, res) => {
     const { ID_Shipment } = req.params;
     const { trackingNumber } = req.body;
@@ -58,7 +55,6 @@ const updateTrackingNumber = async (req, res) => {
     }
 };
 
-// Controller untuk mendapatkan semua data pengiriman
 const getAllShipments = async (req, res) => {
     try {
         const [results] = await db.query('SELECT * FROM Shipment');
@@ -69,7 +65,6 @@ const getAllShipments = async (req, res) => {
     }
 };
 
-// Fungsi untuk mendapatkan city_id berdasarkan nama kota dan provinsi, dan menyimpan jika tidak ada
 const getCityIdByNameAndSave = async (cityName, provinceName, type) => {
     try {
         const [locationResult] = await db.query(
@@ -110,9 +105,8 @@ const getCityIdByNameAndSave = async (cityName, provinceName, type) => {
     }
 };
 
-// Controller untuk mendapatkan biaya pengiriman
 const getShippingCost = async (req, res) => {
-    const { ID_Origin, ID_Address, ID_Size } = req.body;
+    const { ID_Origin, ID_Address, ID_Detail } = req.body;
     const couriers = ['jne', 'pos', 'tiki'];
 
     try {
@@ -136,11 +130,11 @@ const getShippingCost = async (req, res) => {
 
         const { city_id: destCityId } = await getCityIdByNameAndSave(destCityName, destProvinceName, destType);
 
-        const [sizeResult] = await db.query('SELECT Weight FROM Size WHERE ID_Size = ?', [ID_Size]);
-        if (sizeResult.length === 0) {
-            return res.status(400).json({ message: 'Ukuran artwork tidak ditemukan.' });
+        const [artworkDetailResult] = await db.query('SELECT Weight FROM ArtworkDetails WHERE ID_Detail = ?', [ID_Detail]);
+        if (artworkDetailResult.length === 0) {
+            return res.status(400).json({ message: 'Detail artwork tidak ditemukan.' });
         }
-        const weight = sizeResult[0].Weight * 1000;
+        const weight = artworkDetailResult[0].Weight * 1000;
 
         let allShippingCosts = [];
 

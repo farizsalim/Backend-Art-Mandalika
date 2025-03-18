@@ -84,15 +84,49 @@ const deleteReview = async (req, res) => {
 
 const getAllReviews = async (req, res) => {
     try {
-        const [results] = await db.query(`
-            SELECT r.*, u.Username, u.Photo AS ProfilePicture
+        const query = `
+            SELECT 
+                r.*,
+                u.Username,
+                u.Photo AS ProfilePicture,
+                COALESCE(a.Title_Artwork, ac.Title_Artwork) AS ArtworkTitle,
+                COALESCE(a.Artworkimage, ac.RequestImage) AS ArtworkImage,
+                CASE
+                    WHEN o.ID_Artwork IS NOT NULL THEN 'artwork'
+                    WHEN o.ID_ArtworkCustom IS NOT NULL THEN 'artworkcustom'
+                END AS ArtworkType,
+                creator.Username AS CreatorName  -- Nama creator diambil dari sini
             FROM Reviews r
             JOIN Users u ON r.ID_User = u.ID_User
-        `);
-        res.status(200).json(results);
+            JOIN Orders o ON r.ID_Order = o.ID_Order
+            LEFT JOIN Artwork a ON o.ID_Artwork = a.ID_Artwork
+            LEFT JOIN Users AS creator ON a.ID_Creator = creator.ID_User  -- Join ke Users untuk creator
+            LEFT JOIN ArtworkCustom ac ON o.ID_ArtworkCustom = ac.ID_ArtworkCustom
+            ORDER BY r.Created_at DESC
+        `;
+
+        const [results] = await db.query(query);
+
+        // Format image URL dan tambahkan default
+        const formattedReviews = results.map(review => ({
+            ...review,
+            ArtworkImage: review.ArtworkImage 
+                ? `http://localhost:8000/ARTM/images/uploads/${review.ArtworkType}/${review.ArtworkImage}`
+                : 'http://localhost:8000/ARTM/images/default-artwork.jpg',
+            CreatorName: review.CreatorName || 'Unknown Artist'  // Fallback jika null
+        }));
+
+        res.status(200).json(formattedReviews);
+        
     } catch (error) {
         console.error('Error fetching reviews:', error);
-        res.status(500).json({ message: 'Failed to fetch reviews.' });
+        res.status(500).json({ 
+            message: 'Failed to fetch reviews.',
+            error: {
+                code: error.code,
+                detail: error.sqlMessage
+            }
+        });
     }
 };
 
